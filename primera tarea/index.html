@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Tarea LocalStorage</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #18181b;
+      margin: 0;
+      padding: 0;
+      color: #e5e7eb;
+    }
+    .container {
+      max-width: 480px;
+      margin: 48px auto;
+      background: #232326;
+      padding: 32px 28px 28px 28px;
+      border-radius: 18px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+    }
+    h2, h3 {
+      margin-top: 0;
+      color: #ffe066;
+      letter-spacing: 1px;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      margin: 18px 0;
+      font-size: 17px;
+      color: #e5e7eb;
+      cursor: pointer;
+      gap: 12px;
+    }
+
+    /* Estilo switch para los checkboxes */
+    input[type="checkbox"] {
+      appearance: none;
+      width: 42px;
+      height: 22px;
+      background: #39394b;
+      border-radius: 14px;
+      position: relative;
+      outline: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin: 0 10px 0 0;
+    }
+    input[type="checkbox"]:checked {
+      background: #facc15;
+    }
+    input[type="checkbox"]::before {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    input[type="checkbox"]:checked::before {
+      transform: translateX(20px);
+      background: #fffbe7;
+    }
+
+    button {
+      padding: 11px 22px;
+      margin: 14px 10px 0 0;
+      border: none;
+      border-radius: 7px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.12s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    #saveBtn {
+      background: #16a34a;
+      color: #fff;
+    }
+    #saveBtn:hover {
+      background: #22c55e;
+      transform: translateY(-2px) scale(1.04);
+    }
+    #clearBtn {
+      background: #dc2626;
+      color: #fff;
+    }
+    #clearBtn:hover {
+      background: #ef4444;
+      transform: translateY(-2px) scale(1.04);
+    }
+
+    #messages {
+      margin-top: 18px;
+      font-weight: bold;
+      color: #ffe066;
+      background: #232326;
+      border-left: 4px solid #facc15;
+      padding: 10px 16px;
+      border-radius: 6px;
+      min-height: 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    }
+
+    pre#state {
+      background: #18181b;
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      color: #f4f4f4;
+      border: 1px solid #333;
+      margin-top: 10px;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Seleccione sus preferencias</h2>
+
+    <label><input type="checkbox" id="notis"> Notificaciones</label>
+    <label><input type="checkbox" id="filtros"> Recordar filtros</label>
+    <label><input type="checkbox" id="autosave"> Autoguardado</label>
+    
+    <button id="saveBtn">Guardar</button>
+    <button id="clearBtn">Eliminar datos</button>
+    
+    <div id="messages"></div>
+    
+    <h3>Información guardada en localStorage:</h3>
+    <pre id="state">{}</pre>
+  </div>
+
+  <script>
+    const key = "preferencias";
+
+    function showState(){
+      const data = localStorage.getItem(key);
+      document.getElementById("state").textContent = data ? data : "{}";
+    }
+
+    function loadState(){
+      const data = localStorage.getItem(key);
+      if(data){
+        const obj = JSON.parse(data);
+        obj.forEach(id => {
+          const el = document.getElementById(id);
+          if(el) el.checked = true;
+        });
+      }
+      showState();
+    }
+    loadState();
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const seleccion = [];
+      ["notis","filtros","autosave"].forEach(id => {
+        if(document.getElementById(id).checked) seleccion.push(id);
+      });
+      const nuevo = JSON.stringify(seleccion);
+      const anterior = localStorage.getItem(key);
+      if(anterior === nuevo){
+        document.getElementById("messages").textContent = "⚠️ Los datos ya estaban almacenados.";
+      } else {
+        localStorage.setItem(key, nuevo);
+        document.getElementById("messages").textContent = "✅ Datos guardados.";
+      }
+      showState();
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      localStorage.removeItem(key);
+      location.reload();
+    });
+  </script>
+</body>
+</html>
