@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Batalla de Monstruos</title>
+  <style>
+    html,body{height:100%}
+    body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:#0b1023; color:#e5e7eb; padding:16px}
+    .wrap{max-width:980px; margin:0 auto}
+    h1{margin:0 0 12px; font-size:1.25rem}
+    .row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
+    button{background:#1f2937; color:#e5e7eb; border:1px solid #374151; padding:8px 12px; border-radius:8px; cursor:pointer}
+    button[disabled]{opacity:.6; cursor:not-allowed}
+    table{width:100%; border-collapse:separate; border-spacing:0; border-radius:10px; overflow:hidden}
+    thead th{background:#0e172a; padding:8px; border-bottom:1px solid #1f2937}
+    tbody td, tfoot td{padding:8px; text-align:center; border-bottom:1px solid #132033}
+    tbody tr:nth-child(even) td{background:#0c152a}
+    .life{font-weight:700}
+    .turns{color:#93c5fd}
+    .last{background:rgba(239,68,68,.15)!important; outline:1px solid rgba(239,68,68,.35)}
+    #status{font-size:.9rem; color:#9ca3af}
+    .log{height:220px; overflow:auto; background:#0e172a; border:1px solid #1f2937; border-radius:10px; padding:10px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92rem}
+    .result{margin-top:8px; font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Batalla de Monstruos</h1>
+    <div class="row">
+      <button id="btnInit">Nueva partida</button>
+      <button id="btnOne">Jugar 1 ronda</button>
+      <button id="btnAuto3">Jugar 3 rondas</button>
+      <button id="btnAuto5">Jugar 5 rondas</button>
+      <button id="btnAuto">Jugar hasta el final</button>
+      <div id="status"></div>
+    </div>
+    <div id="tableWrap" style="margin-bottom:10px"></div>
+    <div class="log" id="log"></div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const rnd = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+
+    class Monstruo{
+      constructor(name){
+        this.name = name;
+        this.life = 100;
+        this.turns = 3;
+        this.powers = [rnd(10,30), rnd(10,30), rnd(10,30)];
+      }
+      powerIndexByTurns(){
+        if(this.turns >= 3) return 2;
+        if(this.turns === 2) return 1;
+        return 0;
+      }
+      isAlive(){ return this.life > 0; }
+      canAttack(){ return this.isAlive() && this.turns > 0; }
+    }
+
+    class Juego{
+      constructor(){
+        this.names = ["Drako","ZombieX","Furia","Golem"];
+        this.monsters = [];
+        this.lastAttacked = -1;
+        this.over = false;
+        this.final = null;
+      }
+      init(){
+        this.monsters = this.names.map(n=>new Monstruo(n));
+        this.lastAttacked = -1;
+        this.over = false;
+        this.final = null;
+      }
+      validAttackers(){ return this.monsters.map((m,i)=>({m,i})).filter(x=>x.m.canAttack()); }
+      validOpponents(ai){ return this.monsters.map((m,i)=>({m,i})).filter(x=>x.i!==ai && x.m.isAlive()); }
+      step(){
+        if(this.over) return null;
+        const atks = this.validAttackers();
+        if(!atks.length){ this.finishIfNeeded(); return null; }
+        const {m:atk,i:ai} = atks[rnd(0,atks.length-1)];
+        const ops = this.validOpponents(ai);
+        if(!ops.length){ this.finishIfNeeded(); return null; }
+        const {m:def,i:di} = ops[rnd(0,ops.length-1)];
+        const pidx = atk.powerIndexByTurns();
+        const dmg = atk.powers[pidx];
+        def.life = Math.max(0, def.life - dmg);
+        atk.turns = Math.max(0, atk.turns - 1);
+        this.lastAttacked = di;
+        this.finishIfNeeded();
+        return {attacker:atk.name, defender:def.name, dmg, atkTurns:atk.turns, defLife:def.life, atkIndex:pidx+1};
+      }
+      finishIfNeeded(){
+        const alive = this.monsters.filter(m=>m.isAlive());
+        const anyTurns = this.monsters.some(m=>m.canAttack());
+        if(alive.length===1){
+          const w = alive[0];
+          this.over = true;
+          this.final = {type:"winner", winnerName:w.name, life:w.life};
+        } else if(!anyTurns){
+          const maxLife = Math.max(...this.monsters.map(m=>m.life));
+          const leaders = this.monsters.filter(m=>m.life===maxLife);
+          this.over = true;
+          if(leaders.length===1){
+            this.final = {type:"winner", winnerName:leaders[0].name, life:maxLife};
+          }else{
+            this.final = {type:"tie", tieNames:leaders.map(m=>m.name), life:maxLife};
+          }
+        }
+      }
+      playToEnd(maxSteps=500){
+        const log = [];
+        for(let i=0;i<maxSteps && !this.over;i++){
+          const r = this.step();
+          if(r) log.push(r);
+        }
+        return log;
+      }
+      playNRounds(n){
+        const log = [];
+        for(let i=0;i<n && !this.over;i++){
+          const r = this.step();
+          if(r) log.push(r);
+        }
+        return log;
+      }
+    }
+
+    class Tablero{
+      constructor(juego){
+        this.juego = juego;
+        this.root = document.getElementById('tableWrap');
+        this.status = document.getElementById('status');
+        this.result = document.getElementById('result');
+      }
+      render(){
+        const ms = this.juego.monsters;
+        if(!ms.length){ this.root.innerHTML=''; return; }
+        const ths = ['','Drako','ZombieX','Furia','Golem'].map(h=>`<th>${h}</th>`).join('');
+        const rows = [3,2,1].map(level=>`
+          <tr>
+            <td><strong>Ataque ${level}</strong></td>
+            ${ms.map(m=>`<td>${m.powers[level-1]}</td>`).join('')}
+          </tr>
+        `).join('');
+        const lifeRow = `
+          <tr>
+            <td><strong>Vida</strong></td>
+            ${ms.map((m,i)=>`<td class="life ${i===this.juego.lastAttacked?'last':''}">${m.life}</td>`).join('')}
+          </tr>`;
+        const turnsRow = `
+          <tr>
+            <td><strong>Turnos</strong></td>
+            ${ms.map(m=>`<td class="turns">${m.turns}</td>`).join('')}
+          </tr>`;
+        this.root.innerHTML = `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody><tfoot>${lifeRow}${turnsRow}</tfoot></table>`;
+        this.status.textContent = this.statusText();
+        this.result.textContent = this.resultText();
+        document.getElementById('btnOne').disabled = this.juego.over;
+        document.getElementById('btnAuto').disabled = this.juego.over;
+        document.getElementById('btnAuto3').disabled = this.juego.over;
+        document.getElementById('btnAuto5').disabled = this.juego.over;
+      }
+      statusText(){
+        const alive = this.juego.monsters.filter(m=>m.isAlive()).length;
+        const turns = this.juego.monsters.filter(m=>m.canAttack()).length;
+        return `Vivos: ${alive} · Con turnos: ${turns}`;
+      }
+      resultText(){
+        if(!this.juego.over || !this.juego.final) return '';
+        if(this.juego.final.type==='winner') return `Ganador: ${this.juego.final.winnerName} (vida ${this.juego.final.life})`;
+        return `Empate entre: ${this.juego.final.tieNames.join(', ')} (vida ${this.juego.final.life})`;
+      }
+    }
+
+    const game = new Juego();
+    const board = new Tablero(game);
+
+    const logBox = document.getElementById('log');
+    function logClear(){ logBox.innerHTML=''; }
+    function logPush(t){ const d=document.createElement('div'); d.textContent=t; logBox.appendChild(d); logBox.scrollTop=logBox.scrollHeight; }
+
+    document.getElementById('btnInit').addEventListener('click', ()=>{ game.init(); logClear(); board.render(); });
+    document.getElementById('btnOne').addEventListener('click', ()=>{
+      const r = game.step();
+      if(r) logPush(`${r.attacker} usa A${r.atkIndex} (${r.dmg}) sobre ${r.defender}. Vida ${r.defender}=${r.defLife}. Turnos ${r.attacker}=${r.atkTurns}.`);
+      board.render();
+    });
+    document.getElementById('btnAuto').addEventListener('click', ()=>{
+      const logs = game.playToEnd();
+      logs.forEach(r=>logPush(`${r.attacker} usa A${r.atkIndex} (${r.dmg}) sobre ${r.defender}. Vida ${r.defender}=${r.defLife}. Turnos ${r.attacker}=${r.atkTurns}.`));
+      board.render();
+    });
+    document.getElementById('btnAuto3').addEventListener('click', ()=>{
+      const logs = game.playNRounds(3);
+      logs.forEach(r=>logPush(`${r.attacker} usa A${r.atkIndex} (${r.dmg}) sobre ${r.defender}. Vida ${r.defender}=${r.defLife}. Turnos ${r.attacker}=${r.atkTurns}.`));
+      board.render();
+    });
+    document.getElementById('btnAuto5').addEventListener('click', ()=>{
+      const logs = game.playNRounds(5);
+      logs.forEach(r=>logPush(`${r.attacker} usa A${r.atkIndex} (${r.dmg}) sobre ${r.defender}. Vida ${r.defender}=${r.defLife}. Turnos ${r.attacker}=${r.atkTurns}.`));
+      board.render();
+    });
+
+    game.init();
+    board.render();
+  </script>
+</body>
+</html>
